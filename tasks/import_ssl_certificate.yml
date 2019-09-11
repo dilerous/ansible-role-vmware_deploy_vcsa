@@ -109,6 +109,11 @@
   - name: Start all VCSA services
     shell: "service-control --start --all"
 
+  - name: Restart VAMI HTTP Service
+    service:
+      name: vami-lighttp # noqa 503
+      state: restarted
+
   ## Not sure this is needed for embedded appliance deployments.
   # - name: Run ls_update
   #   shell: >
