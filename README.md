@@ -136,14 +136,14 @@ vcsa_root_expiration_days: 90
 #### Import CA Signed Certificates
 
 Set '**vcsa_use_signed_certificate**' to '**yes**' if you would like to import CA signed certificates. The default setting is '**no**'.
+```
+vcsa_use_signed_certificate: no
+```
 
 If this setting is enabled, then the the following certificates are requird and should be placed in the '**files/certs**' folder for the role.
 - Host certificate with the file name '**hostname.pem**' (the hostname must match what has been set in the inventory). The PEM file must include the host certificate and CA chain.
 - Host certificate key with the file name '**hostname.key**' (the hostname must match what has been set in the inventory). This needs to be the unencrypted file if it has been encrypted.
 - CA root certificate with the file name '**ca.crt**'.
-```
-vcsa_use_signed_certificate: no
-```
 
 #### Active Directory Domain Membership
 
