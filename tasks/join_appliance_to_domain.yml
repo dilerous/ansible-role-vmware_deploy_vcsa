@@ -1,0 +1,42 @@
+---
+- name: Update krb5.conf file
+  lineinfile:
+    path: /etc/krb5.conf
+    create: yes
+    regexp: '^\[libdefaults\]$'
+    line: "[libdefaults]"
+
+- name: Update rdns in krb5.conf file
+  lineinfile:
+    path: /etc/krb5.conf
+    regexp: '^\srdns\s=\s(false|true)$'
+    insertafter: '^\[libdefaults\]$'
+    line: " rdns = false"
+
+- name: "Check if appliance is already joined to domain: {{ vcsa_ad_dom_join_domain }}"
+  shell: "/opt/likewise/bin/domainjoin-cli query"
+  register: ad_query
+  changed_when: false
+
+- name: "Join appliance to domain: {{ vcsa_ad_dom_join_domain }}"
+  shell: >
+    /opt/likewise/bin/domainjoin-cli join
+    --ou "{{ vcsa_ad_dom_join_ou | default() }}"
+    "{{ vcsa_ad_dom_join_domain }}"
+    "{{ vcsa_ad_dom_join_username }}"
+    "{{ vcsa_ad_dom_join_password }}"
+  register: ad_join
+  ignore_errors: yes
+  when: not (ad_query.stdout is search('Domain = ' + vcsa_ad_dom_join_domain|upper))
+  changed_when: ad_join.stdout is search("SUCCESS")
+  
+- name: Leave the domain if there was an issue
+  command: "/opt/likewise/bin/domainjoin-cli leave"
+  register: ad_leave
+  when: ad_join.rc is defined and ad_join.rc > 0
+
+- name: Fail if there was an issue joining the domain
+  fail:
+    msg: "{{ ad_join.stdout }}"
+  when: |
+    (ad_join.rc is defined and ad_join.rc > 0)

@@ -1,0 +1,121 @@
+---
+- name: Check that certificate file exists
+  stat:
+    path: "{{ role_path }}/files/certs/{{ inventory_hostname | lower }}.pem"
+    get_checksum: no
+  delegate_to: localhost
+  register: check_stat_cert
+
+- name: Check that certificate key exists
+  stat:
+    path: "{{ role_path }}/files/certs/{{ inventory_hostname | lower }}.key"
+    get_checksum: no
+  delegate_to: localhost
+  register: check_stat_cert_key
+
+- name: Check that CA certificate exists
+  stat:
+    path: "{{ role_path }}/files/certs/ca.crt"
+    get_checksum: no
+  delegate_to: localhost
+  register: check_stat_ca_cert
+
+- name: Fail if certificate file or key are missing
+  fail:
+    msg: "Host certificate, key or CA certificate are missing."
+  when: |
+    not (check_stat_cert.stat.exists|bool) or
+    not (check_stat_cert_key.stat.exists|bool) or
+    not (check_stat_ca_cert.stat.exists|bool)
+
+- name: Creates directory to store certificate files
+  file:
+    path: /certificates
+    state: directory
+
+- name: Copy certificate file
+  copy:
+    src: "{{ role_path }}/files/certs/{{ inventory_hostname | lower }}.pem"
+    dest: "/certificates/{{ inventory_hostname | lower }}.pem"
+
+- name: Copy certificate key
+  copy:
+    src: "{{ role_path }}/files/certs/{{ inventory_hostname | lower }}.key"
+    dest: "/certificates/{{ inventory_hostname | lower }}.key"
+
+- name: Copy CA certificate file
+  copy:
+    src: "{{ role_path }}/files/certs/ca.crt"
+    dest: "/certificates/ca.crt"
+
+- name: Export current certificate
+  shell: "/usr/lib/vmware-vmafd/bin/vecs-cli entry getcert --store MACHINE_SSL_CERT --alias __MACHINE_CERT --output /certificates/current_machine.crt"
+  changed_when: false
+
+- name: Get current certificate thumbprint
+  shell: "openssl x509 -in /certificates/current_machine.crt -noout -sha1 -fingerprint"
+  register: current_cert_thumbprint
+  changed_when: false
+
+- name: Set Current thumbprint
+  set_fact:
+    current_thumbprint: "{{ current_cert_thumbprint.stdout | regex_search(query) }}"
+  vars:
+    query: '(?<=SHA1\sFingerprint=)([0-9A-F]{2}:){19}[0-9A-F]{2}'
+
+- name: Get new certificate thumbprint
+  shell: "openssl x509 -in /certificates/{{ inventory_hostname }}.pem -noout -sha1 -fingerprint"
+  register: new_cert_thumbprint
+  changed_when: false
+
+- name: Set New thumbprint
+  set_fact:
+    new_thumbprint: "{{ new_cert_thumbprint.stdout | regex_search(query) }}"
+  vars:
+    query: '(?<=SHA1\sFingerprint=)([0-9A-F]{2}:){19}[0-9A-F]{2}'
+
+- name: block
+  block:
+  - name: Stop all VCSA services
+    shell: "service-control --stop --all"
+
+  - name: Start vmafdd service
+    shell: "service-control --start vmafdd"
+
+  - name: Start vmdird service
+    shell: "service-control --start vmdird"
+
+  - name: Start vmcad service
+    shell: "service-control --start vmcad"
+
+  - name: Add CA certificate to SSO
+    shell: >
+      /usr/lib/vmware-vmafd/bin/dir-cli trustedcert publish --chain --cert /certificates/ca.crt
+      --login "{{ vcsa_sso_username }}"
+      --password "{{ vcsa_sso_password }}"
+
+  - name: Refresh certificate store
+    shell: "/usr/lib/vmware-vmafd/bin/vecs-cli force-refresh"
+
+  - name: Delete old certificate store
+    shell: "/usr/lib/vmware-vmafd/bin/vecs-cli entry delete --store MACHINE_SSL_CERT --alias __MACHINE_CERT -y"
+
+  - name: Create new certificate store
+    shell: >
+      /usr/lib/vmware-vmafd/bin/vecs-cli entry create --store MACHINE_SSL_CERT --alias __MACHINE_CERT
+      --cert "/certificates/{{ inventory_hostname }}.pem"
+      --key "/certificates/{{ inventory_hostname }}.key"
+
+  - name: Start all VCSA services
+    shell: "service-control --start --all"
+
+  ## Not sure this is needed for embedded appliance deployments.
+  # - name: Run ls_update
+  #   shell: >
+  #     python /usr/lib/vmidentity/tools/scripts/ls_update_certs.py
+  #     --url "https://localhost/lookupservice/sdk"
+  #     --fingerprint "{{ current_thumbprint }}"
+  #     --certfile "/certificates/{{ inventory_hostname }}.pem"
+  #     --user "{{ vcsa_sso_username }}"
+  #     --password "{{ vcsa_sso_password }}"
+  when: current_thumbprint != new_thumbprint

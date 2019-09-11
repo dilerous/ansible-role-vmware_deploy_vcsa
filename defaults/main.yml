@@ -1,0 +1,75 @@
+---
+## Default list of NTP Servers that will be used.
+ntp_servers:
+  - "0.pool.ntp.org"
+  - "1.pool.ntp.org"
+  - "2.pool.ntp.org"
+  - "3.pool.ntp.org"
+
+# HTTP REST API Variables
+http_content_type: "application/json"
+http_accept: "application/json"
+http_validate_certs: no
+http_body_format: "json"
+
+## Default for enabling certificate verification when connecting
+## to the VCSA appliance.
+vcsa_validate_certs: no
+
+## Default setting for the use of CA signed certificates.
+vcsa_use_signed_certificate: no
+
+## Default root account policies.
+vcsa_root_expiration_disable: no
+vcsa_root_expiration_days: 90
+
+## Default setting for joining the appliance to the domain.
+vcsa_join_to_domain: no
+
+## Default database settings.
+default_database_max_connections: 50
+default_database_task_cleanup: true
+default_database_task_retention: 30
+default_database_event_cleanup: true
+default_database_event_retention: 30
+
+## Default runtime settings.
+default_runtime_unique_id: 1
+
+## Default user directory settings.
+default_user_directory_timeout: 60
+default_user_directory_query_limit: true
+default_user_directory_query_limit_size: 5000
+default_user_directory_validation: true
+default_user_directory_validation_period: 1400
+
+## Default mail settings.
+default_mail_server: ""
+default_mail_sender: ""
+
+## Default SNMP receiver settings.
+default_snmp_receiver_url: "localhost"
+default_snmp_receiver_enabled: true
+default_snmp_receiver_port: 162
+default_snmp_receiver_community: "public"
+
+## Default timeout settings.
+default_timeout_normal_operations: 30
+default_timeout_long_operations: 120
+
+## Default logging option.
+default_logging_level: "info"
+
+## Default statistics levels.
+default_interval_past_day_level: 1
+default_interval_past_week_level: 1
+default_interval_past_month_level: 1
+default_interval_past_year_level: 1
+
+## Default cluster settings.
+default_enable_ha: true
+default_ha_vm_monitoring: "vmMonitoringOnly"
+default_enable_drs: true
+default_drs_vm_behavior: "fullyAutomated"
+default_enable_vsan: false
+default_vsan_autoclaim_storage: false

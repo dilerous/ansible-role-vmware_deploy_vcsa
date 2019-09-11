@@ -1,0 +1,123 @@
+---
+# - name: Get vCenter Version and Build
+#   include_tasks: get_version.yml
+
+- name: Wait for SSH on first boot
+  include_tasks: wait_for_ssh.yml
+
+- name: Wait for vCenter to complete firstboot operation
+  include_tasks: wait_for_firstboot_operation.yml
+
+- name: Update root account
+  include_tasks: update_root_account.yml
+
+- name: Set up Syslog
+  include_tasks: configure_syslog.yml
+
+- name: Update SSO-Config utility
+  include_tasks: update_identity_sso_config_cli.yml
+
+- name: Join the Appliance to AD domain
+  include_tasks: join_appliance_to_domain.yml
+  when: vcsa_join_to_domain is defined and vcsa_join_to_domain|bool
+
+- name: Reboot appliance to complete AD join
+  include_tasks: reboot_appliance_and_wait.yml
+  when: ad_join is defined and ad_join.changed|bool
+
+- name: Add Identity Sources
+  include_tasks: add_domain_to_identity_sources.yml
+  when: |
+    (vcsa_join_to_domain is defined and vcsa_join_to_domain|bool) and
+    (ad_join is defined and ad_join.changed|bool) and
+    (vcsa_reboot is defined and vcsa_reboot.changed|bool)
+
+- name: Log into API Rest service and wait for initialize
+  include_tasks: rest_api_auth_login.yml
+
+- name: Set defined services to start
+  include_tasks: start_vcsa_services.yml
+  when: vcsa_services_to_start is defined
+
+- name: Set defined services to stop
+  include_tasks: stop_vcsa_services.yml
+  when: vcsa_services_to_stop is defined
+
+- name: Log out of the API rest service
+  include_tasks: rest_api_auth_logout.yml
+
+- name: Assign vCenter Administrators
+  include_tasks: assign_vcenter_permissions.yml
+  vars:
+    vcsa_role: "Admin"
+  loop: "{{ vcsa_vcenter_admin_groups }}"
+  loop_control:
+    loop_var: vcsa_group
+  when: |
+    (vcsa_join_to_domain is defined and vcsa_join_to_domain|bool) and
+    vcsa_vcenter_admin_groups is defined
+
+- name: Assign vCenter Read Only Users
+  include_tasks: assign_vcenter_permissions.yml
+  vars:
+    vcsa_role: "ReadOnly"
+  loop: "{{ vcsa_vcenter_readonly_groups }}"
+  loop_control:
+    loop_var: vcsa_group
+  when: |
+    (vcsa_join_to_domain is defined and vcsa_join_to_domain|bool) and
+    vcsa_vcenter_readonly_groups is defined
+
+- name: Assign Global Administrators
+  include_tasks: assign_global_permissions.yml
+  loop: "{{ vcsa_global_admin_groups }}"
+  loop_control:
+    loop_var: vcsa_global_admin_group
+  when: |
+    (vcsa_join_to_domain is defined and vcsa_join_to_domain|bool) and
+    vcsa_global_admin_groups is defined
+
+- name: Assign vCenter License
+  include_tasks: assign_vcenter_license.yml
+  when: vcsa_license_key is defined
+
+- name: Configure vCenter Settings
+  include_tasks: configure_vcenter_settings.yml
+
+- name: Create defined datacenters
+  include_tasks: create_datacenter.yml
+  loop: "{{ vcsa_datacenters }}"
+  loop_control:
+    loop_var: datacenter
+  when: vcsa_datacenters is defined
+
+- name: Create defined clusters and configure vSAN
+  include_tasks: create_cluster.yml
+  loop: "{{ vcsa_clusters }}"
+  loop_control:
+    loop_var: cluster
+  when: vcsa_clusters is defined
+
+- name: Configure Advanced cluster Options
+  include_tasks: configure_cluster_advanced_options.yml
+  when: vcsa_advanced_settings is defined
+
+- name: Add ESXi hosts to vCenter
+  include_tasks: add_esxi_host.yml
+  loop: "{{ vcsa_esxi_hosts }}"
+  loop_control:
+    loop_var: esxi
+  when: vcsa_esxi_hosts is defined
+
+- name: Assign ESXi License
+  include_tasks: assign_esxi_license.yml
+  loop: "{{ vcsa_esxi_hosts }}"
+  loop_control:
+    loop_var: esxi_host
+  when: |
+    vcsa_esxi_license is defined and
+    vcsa_esxi_hosts is defined
+
+- name: Import CA Signed Certificates
+  include_tasks: import_ssl_certificate.yml
+  when: vcsa_use_signed_certificate|bool

@@ -1,0 +1,43 @@
+---
+- name: "Create Cluster {{ cluster.name }}"
+  vmware_cluster:
+    hostname: "{{ inventory_hostname }}"
+    username: "{{ vcsa_sso_username }}"
+    password: "{{ vcsa_sso_password }}"
+    validate_certs: "{{ vcsa_validate_certs }}"
+    datacenter_name: "{{ cluster.datacenter }}"
+    cluster_name: "{{ cluster.name }}"
+    enable_ha: "{{ cluster.enable_ha | default(default_enable_ha) }}"
+    ha_vm_monitoring: "{{ cluster.ha_vm_monitoring | default(default_ha_vm_monitoring) }}"
+    enable_drs: "{{ cluster.enable_drs | default(default_enable_drs) }}"
+    drs_default_vm_behavior: "{{ cluster.drs_vm_behavior | default(default_drs_vm_behavior) }}"
+    enable_vsan: "{{ cluster.enable_vsan | default(default_enable_vsan) }}"
+    vsan_auto_claim_storage: "{{ cluster.vsan_autoclaim_storage | default(default_vsan_autoclaim_storage) }}"
+  register: create_cluster
+  delegate_to: localhost
+
+- name: Assign vSAN License Key
+  block:
+  - include_tasks: rest_api_auth_login.yml
+
+  - name: Get Cluster Information
+    uri:
+      url: "https://{{ inventory_hostname | lower }}/rest/vcenter/cluster?filter.names.1={{ cluster.name }}"
+      validate_certs: "{{ http_validate_certs }}"
+      method: GET
+      headers:
+        Accept: "{{ http_accept }}"
+        vmware-api-session-id: "{{ vcsa_api_session_key }}"
+      status_code: [200]
+    register: vcsa_clusters
+    delegate_to: localhost
+
+  - include_tasks: rest_api_auth_logout.yml
+
+  - include_tasks: assign_vsan_license.yml
+    vars:
+      cluster_moid: "{{ vcsa_clusters.json.value[0].cluster }}"
+      vsan_license: "{{ cluster.vsan_license_key }}"
+  when: |
+    (cluster.enable_vsan is defined and cluster.enable_vsan|bool) and
+    cluster.vsan_license_key is defined

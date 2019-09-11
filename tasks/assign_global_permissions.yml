@@ -1,0 +1,104 @@
+---
+- name: Get GetGlobalAccessControlList Session Cookie
+  uri:
+    url: "https://{{ inventory_hostname|lower }}/invsvc/mob3/?moid=authorizationService&method=AuthorizationService.GetGlobalAccessControlList"
+    user: "{{ vcsa_sso_username }}"
+    password: "{{ vcsa_sso_password }}"
+    validate_certs: "{{ http_validate_certs }}"
+    force_basic_auth: yes
+    method: GET
+    status_code: [200]
+    return_content: yes
+  register: vcsa_getacl_auth_response
+  delegate_to: localhost
+
+- name: Set GetGlobalAccessControlList Session Cookie
+  set_fact:
+    vcsa_mob_session_cookie: "{{ vcsa_getacl_auth_response.set_cookie }}"
+
+- name: Set vmware-session-nonce
+  set_fact:
+    vmware_session_nonce: "{{ vcsa_getacl_auth_response.content | regex_search(query) }}"
+  vars:
+    query: '(?<=name="vmware-session-nonce" type="hidden" value=\")[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}(?=\")'
+
+- name: Get GetGlobalAccessControlList
+  uri:
+    url: "https://{{ inventory_hostname|lower }}/invsvc/mob3/?moid=authorizationService&method=AuthorizationService.GetGlobalAccessControlList"
+    user: "{{ vcsa_sso_username }}"
+    password: "{{ vcsa_sso_password }}"
+    validate_certs: "{{ http_validate_certs }}"
+    force_basic_auth: yes
+    method: POST
+    headers:
+      Cookie: "{{ vcsa_mob_session_cookie }}"
+    body_format: form-urlencoded
+    body:
+      vmware-session-nonce: "{{ vmware_session_nonce }}"
+    status_code: [200]
+    return_content: yes
+  register: vcsa_getacl_response
+  delegate_to: localhost
+
+- name: Logout Session
+  uri:
+    url: "https://{{ inventory_hostname|lower }}/invsvc/mob3/logout"
+    validate_certs: "{{ http_validate_certs }}"
+    method: GET
+    headers:
+      Cookie: "{{ vcsa_mob_session_cookie }}"
+    status_code: [200]
+  delegate_to: localhost
+
+- name: block
+  block:
+  - name: Get AddGlobalAccessControlList Session Cookie
+    uri:
+      url: "https://{{ inventory_hostname|lower }}/invsvc/mob3/?moid=authorizationService&method=AuthorizationService.AddGlobalAccessControlList"
+      user: "{{ vcsa_sso_username }}"
+      password: "{{ vcsa_sso_password }}"
+      validate_certs: "{{ http_validate_certs }}"
+      force_basic_auth: yes
+      method: GET
+      status_code: [200]
+      return_content: yes
+    register: vcsa_mob_response
+    delegate_to: localhost
+
+  - name: Set AddGlobalAccessControlList Session Cookie
+    set_fact:
+      vcsa_mob_session_cookie: "{{ vcsa_mob_response.set_cookie }}"
+
+  - name: Set vmware-session-nonce
+    set_fact:
+      vmware_session_nonce: "{{ vcsa_mob_response.content | regex_search(query) }}"
+    vars:
+      query: '(?<=name="vmware-session-nonce" type="hidden" value=\")[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}(?=\")'
+
+  - name: Set Global Permissions
+    uri:
+      url: "https://{{ inventory_hostname|lower }}/invsvc/mob3/?moid=authorizationService&method=AuthorizationService.AddGlobalAccessControlList"
+      validate_certs: "{{ http_validate_certs }}"
+      method: POST
+      headers:
+        Cookie: "{{ vcsa_mob_session_cookie }}"
+      body_format: form-urlencoded
+      body:
+        vmware-session-nonce: "{{ vmware_session_nonce }}"
+        permissions: "{{ lookup('template' , 'global_permissions.j2') }}"
+      status_code: [200]
+      return_content: yes
+    register: add_global_perm
+    changed_when: '"Method Invocation Result: void" in add_global_perm.content'
+    delegate_to: localhost
+
+  - name: Logout Session
+    uri:
+      url: "https://{{ inventory_hostname|lower }}/invsvc/mob3/logout"
+      validate_certs: "{{ http_validate_certs }}"
+      method: GET
+      headers:
+        Cookie: "{{ vcsa_mob_session_cookie }}"
+      status_code: [200]
+    delegate_to: localhost
+  when: not (vcsa_getacl_response.content is search(vcsa_global_admin_group))

@@ -1,0 +1,33 @@
+---
+- name: "Add ESXi Host {{ esxi.hostname }} to vCenter {{ inventory_hostname }}"
+  vmware_host:
+    hostname: "{{ inventory_hostname }}"
+    username: "{{ vcsa_sso_username }}"
+    password: "{{ vcsa_sso_password }}"
+    validate_certs: "{{ vcsa_validate_certs }}"
+    datacenter: "{{ esxi.datacenter }}"
+    cluster: "{{ esxi.cluster }}"
+    esxi_hostname: "{{ esxi.hostname }}"
+    esxi_username: "{{ hostvars[esxi.hostname]['esxi_admin_username'] if (hostvars[esxi.hostname] is defined and hostvars[esxi.hostname]['esxi_admin_username'] is defined) else default_esxi_admin_username }}"
+    esxi_password: "{{ hostvars[esxi.hostname]['esxi_admin_password'] if (hostvars[esxi.hostname] is defined and hostvars[esxi.hostname]['esxi_admin_password'] is defined) else default_esxi_admin_password }}"
+    state: present
+  delegate_to: localhost
+
+- include_tasks: assign_esxi_license.yml
+  vars:
+    esxi_hostname: "{{ esxi.hostname }}"
+    esxi_license: "{{ hostvars[esxi.hostname]['esxi_license_key'] if (hostvars[esxi.hostname] is defined and hostvars[esxi.hostname]['esxi_license_key'] is defined) else esxi.license_key }}"
+  when: |
+    esxi.license_key is defined or
+    (hostvars[esxi.hostname] is defined and hostvars[esxi.hostname]['esxi_license_key'] is defined)
+
+- name: Exit Maintenance Mode
+  vmware_maintenancemode:
+    hostname: "{{ inventory_hostname }}"
+    username: "{{ vcsa_sso_username }}"
+    password: "{{ vcsa_sso_password }}"
+    validate_certs: "{{ vcsa_validate_certs }}"
+    esxi_hostname: "{{ esxi.hostname }}"
+    timeout: 1200
+    state: absent
+  delegate_to: localhost

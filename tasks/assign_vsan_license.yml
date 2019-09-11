@@ -1,0 +1,105 @@
+---
+- name: Get addLicense Session Cookie
+  uri:
+    url: "https://{{ inventory_hostname|lower }}/mob/?moid=LicenseManager&method=addLicense"
+    user: "{{ vcsa_sso_username }}"
+    password: "{{ vcsa_sso_password }}"
+    validate_certs: "{{ http_validate_certs }}"
+    force_basic_auth: yes
+    method: GET
+    status_code: [200]
+    return_content: yes
+  register: vcsa_addlic_auth_response
+  delegate_to: localhost
+
+- name: Set addLicense Session Cookie
+  set_fact:
+    vcsa_mob_session_cookie: "{{ vcsa_addlic_auth_response.set_cookie }}"
+
+- name: Set vmware-session-nonce
+  set_fact:
+    vmware_session_nonce: "{{ vcsa_addlic_auth_response.content | regex_search(query) }}"
+  vars:
+    query: '(?<=name="vmware-session-nonce" type="hidden" value=\")[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}(?=\")'
+
+- name: Add License
+  uri:
+    url: "https://{{ inventory_hostname|lower }}/mob/?moid=LicenseManager&method=addLicense"
+    user: "{{ vcsa_sso_username }}"
+    password: "{{ vcsa_sso_password }}"
+    validate_certs: "{{ http_validate_certs }}"
+    force_basic_auth: yes
+    method: POST
+    headers:
+      Cookie: "{{ vcsa_mob_session_cookie }}"
+    body_format: form-urlencoded
+    body:
+      vmware-session-nonce: "{{ vmware_session_nonce }}"
+      licenseKey: "{{ vsan_license }}"
+    status_code: [200]
+    # return_content: yes
+  register: vcsa_addlic_response
+  delegate_to: localhost
+
+- name: Logout Session
+  uri:
+    url: "https://{{ inventory_hostname|lower }}/mob/logout"
+    validate_certs: "{{ http_validate_certs }}"
+    method: GET
+    headers:
+      Cookie: "{{ vcsa_mob_session_cookie }}"
+    status_code: [200]
+  delegate_to: localhost
+
+- name: Get updateAssignedLicense Session Cookie
+  uri:
+    url: "https://{{ inventory_hostname|lower }}/mob/?moid=LicenseAssignmentManager&method=updateAssignedLicense"
+    user: "{{ vcsa_sso_username }}"
+    password: "{{ vcsa_sso_password }}"
+    validate_certs: "{{ http_validate_certs }}"
+    force_basic_auth: yes
+    method: GET
+    status_code: [200]
+    return_content: yes
+  register: vcsa_updlic_auth_response
+  delegate_to: localhost
+
+- name: Set updateAssignedLicense Session Cookie
+  set_fact:
+    vcsa_mob_session_cookie: "{{ vcsa_updlic_auth_response.set_cookie }}"
+
+- name: Set vmware-session-nonce
+  set_fact:
+    vmware_session_nonce: "{{ vcsa_updlic_auth_response.content | regex_search(query) }}"
+  vars:
+    query: '(?<=name="vmware-session-nonce" type="hidden" value=\")[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}(?=\")'
+
+- name: Update Assigned License
+  uri:
+    url: "https://{{ inventory_hostname|lower }}/mob/?moid=LicenseAssignmentManager&method=updateAssignedLicense"
+    user: "{{ vcsa_sso_username }}"
+    password: "{{ vcsa_sso_password }}"
+    validate_certs: "{{ http_validate_certs }}"
+    force_basic_auth: yes
+    method: POST
+    headers:
+      Cookie: "{{ vcsa_mob_session_cookie }}"
+    body_format: form-urlencoded
+    body:
+      vmware-session-nonce: "{{ vmware_session_nonce }}"
+      entity: "{{ cluster_moid }}"
+      licenseKey: "{{ vsan_license }}"
+    status_code: [200]
+    # return_content: yes
+  register: vcsa_updlic_response
+  delegate_to: localhost
+
+- name: Logout Session
+  uri:
+    url: "https://{{ inventory_hostname|lower }}/mob/logout"
+    validate_certs: "{{ http_validate_certs }}"
+    method: GET
+    headers:
+      Cookie: "{{ vcsa_mob_session_cookie }}"
+    status_code: [200]
+  delegate_to: localhost
