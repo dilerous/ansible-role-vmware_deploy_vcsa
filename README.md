@@ -392,6 +392,7 @@ Example Playbook
     ```
     - hosts: vcsa_appliances
       become: no
+      gather_facts: False
       roles:
         - nmshadey.vmware_deploy_vcsa
     ```
