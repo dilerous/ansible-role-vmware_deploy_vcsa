@@ -23,4 +23,4 @@ galaxy_info:
     - vcsa
 
 dependencies:
-  - { role: nmshadey.vmware_deploy_ova, tags: [ 'deploy' ] }
+  - { role: simplygeekuk.vmware_deploy_ova, tags: [ 'deploy' ] }
