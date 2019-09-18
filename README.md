@@ -384,7 +384,7 @@ vcsa_validate_certs: no
 Dependencies
 ------------
   ```
-  - { role: vmware_deploy_ova, tags: [ 'deploy' ] }
+  - { role: simplygeekuk.vmware_deploy_ova, tags: [ 'deploy' ] }
   ```
 
 Example Playbook
@@ -394,7 +394,7 @@ Example Playbook
       become: no
       gather_facts: False
       roles:
-        - nmshadey.vmware_deploy_vcsa
+        - simplygeekuk.vmware_deploy_vcsa
     ```
 
 License
