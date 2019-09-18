@@ -4,9 +4,9 @@ vmware_deploy_vcsa
 Deploys the VMware vCenter Server Appliance from OVA.
 
 The following configuration can be achieved:
-- Update root account expire date or set to never expire.
+- Update root account expiry date or set to never expire.
 - Configure Syslog.
-- Join appliance to AD domain and configure identity sources.
+- Join the appliance to an AD domain and configure identity sources.
 - Import CA Signed Certificates.
 - Configure vCenter general and statistics settings.
 - Start and Stop services.
